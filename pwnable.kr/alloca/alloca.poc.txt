@@ -1,0 +1,16 @@
+var1 = size + 4
+var2 = var1 + 15
+var1 = 15
+var1 = var1 + var2
+var3 = 16
+var1 = var1 / 16
+var1 = var1 * 16
+esp = esp - var1
+var1 = esp
+var1 = var1 + 15
+var1 = var1 & 0xfffffff0
+
+------------
+
+$esp = $esp - ((size + 34) / 16 * 16)
+var1 = ($esp + 15) & 0xfffffff0

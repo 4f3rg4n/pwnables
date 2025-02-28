@@ -1,0 +1,6 @@
+0x00000000004016f6  Human::give_shell()
+0x0000000000401716  Human::introduce()
+0x00000000004017b2  Human::Human()
+0x00000000004017b2  Human::Human()
+0x00000000004017e4  Human::~Human()
+0x00000000004017e4  Human::~Human()
