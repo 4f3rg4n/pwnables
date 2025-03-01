@@ -33,3 +33,4 @@ p.sendline("2")
 p.sendline("2")
 p.interactive()
 
+#flag: PWNIL{COOL_so_thats_how_debuggers_are_made}
