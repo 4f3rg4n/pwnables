@@ -166,6 +166,9 @@ def parse_heap_leak_line(line: str):
 
     return int.from_bytes(data, 'little')
 
+def init_libc_addr_into_heap(p: process):
+    create_comment
+
 def leak_heap(p: process):
     global ARB_PTR_WRITE_CHK_ID
     global ARB_CHK_ID_B

