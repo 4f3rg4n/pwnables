@@ -5,7 +5,7 @@ def main():
     context.arch = 'amd64'  # Ensure 64-bit architecture
 
     ### run ###
-    #p = process("./shellcode")
+    #p = process("./shellcope")
     p = remote("pwnable.co.il", 9001)
 
     ### payload start ###

