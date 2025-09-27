@@ -32,7 +32,7 @@ def after(io: process, data: str):
 
 def free(io: process):
     """
-    free the Man & Woman objects.
+    free Man & Woman objects.
     """
     io.sendlineafter("3. free", '3')
 
