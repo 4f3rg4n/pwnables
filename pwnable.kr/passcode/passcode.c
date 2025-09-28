@@ -14,8 +14,9 @@ void login(){
         scanf("%d", passcode2);
 
 	printf("checking...\n");
-	if(passcode1==338150 && passcode2==13371337){
+	if(passcode1==123456 && passcode2==13371337){
                 printf("Login OK!\n");
+		setregid(getegid(), getegid());
                 system("/bin/cat flag");
         }
         else{
@@ -32,7 +33,7 @@ void welcome(){
 }
 
 int main(){
-	printf("Toddler's Secure Login System 1.0 beta.\n");
+	printf("Toddler's Secure Login System 1.1 beta.\n");
 
 	welcome();
 	login();
@@ -41,3 +42,4 @@ int main(){
 	printf("Now I can safely trust you that you have credential :)\n");
 	return 0;	
 }
+
