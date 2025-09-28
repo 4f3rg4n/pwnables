@@ -1,4 +1,4 @@
-// compiled with : gcc -o memcpy memcpy.c -m32 -lm
+// gcc -o memcpy memcpy.c -m32 -lm
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -22,7 +22,6 @@ char* slow_memcpy(char* dest, const char* src, size_t len){
 char* fast_memcpy(char* dest, const char* src, size_t len){
 	size_t i;
 	// 64-byte block fast copy
-	printf("src: %p, dest, %p\n", src, dest);
 	if(len >= 64){
 		i = len / 64;
 		len &= (64-1);
@@ -117,6 +116,7 @@ int main(void){
 	}
 
 	printf("thanks for helping my experiment!\n");
-	printf("flag : ----- erased in this source code -----\n");
+	printf("flag : [erased here. get it from server]\n");
 	return 0;
 }
+
