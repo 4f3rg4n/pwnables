@@ -33,4 +33,4 @@ if __name__ == "__main__":
     main()
 
 #flag: PWNIL{I_guess_its_not_that_hard_after_all_if_you_did_it!}
-#Note: you need to run it somtinmes until it will get random number with LSB set to 0
+#Note: you need to run it until it will get random number with LSB set to 0
